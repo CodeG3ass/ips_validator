@@ -15,20 +15,27 @@ def synchronized(lock):
         return wrapper
     return decorator
 
-# Helper functions
+# Helper function to parse IP, range, or CIDR
 def parse_ip_ranges(ip_range: str) -> Set[str]:
-    """Parse single IP, range or CIDR to a set of IPs."""
+    """Parse a single IP, range, or CIDR notation to a set of IPs."""
     try:
+        # Проверка диапазона IP (например, '192.168.1.1-192.168.1.10')
         if "-" in ip_range:
             start_ip, end_ip = map(ipaddress.ip_address, ip_range.split("-"))
             return {str(ip) for ip in ipaddress.summarize_address_range(start_ip, end_ip)}
+        
+        # Проверка CIDR (например, '192.168.1.0/24')
         elif "/" in ip_range:
-            return {str(ip) for ip in ipaddress.ip_network(ip_range, strict=False)}
+            network = ipaddress.ip_network(ip_range, strict=False)
+            return {str(ip) for ip in network.hosts()}  # Получаем все хосты в сети
+        
+        # Проверка одиночного IP (например, '192.168.1.1')
         else:
-            ip = ipaddress.ip_address(ip_range)  # Validates the IP
+            ip = ipaddress.ip_address(ip_range)  # Проверка и преобразование в IP
             return {str(ip)}
+    
     except ValueError:
-        return set()  # Ignore invalid IPs
+        return set()
 
 # Context Manager
 class PathSelector:
@@ -77,7 +84,7 @@ class IPProcessor:
     def extract_ips_from_file(self, file_path: str) -> Set[str]:
         with open(file_path, 'r') as file:
             content = file.read()
-        ip_patterns = re.findall(r"\b(?:\d{1,3}\.){3}\d{1,3}(?:/\d{1,2}|(?:-\d{1,3}\.){3}\d{1,3})?\b", content)
+        ip_patterns = re.findall(r"(?:\d{1,3}\.){3}\d{1,3}(?:/\d{1,2}|(?:-\d{1,3}\.){3}\d{1,3})?", content)
         ips = set()
         for ip_pattern in ip_patterns:
             ips.update(parse_ip_ranges(ip_pattern))
